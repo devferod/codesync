@@ -1,0 +1,275 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strings"
+	"time"
+
+	"gitsync/internal/database"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+)
+
+// @title           GitSync API
+// @version         1.0
+// @description     API for managing git repositories and replication targets
+// @host            localhost:8080
+// @BasePath        /
+
+// Allowed providers per AGENT_GUIDE security principles
+var allowedProviders = map[string]bool{
+	"github": true,
+	"gitlab": true,
+	"gitea":  true,
+}
+
+// Repository represents a source repository
+type Repository struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	SourceProvider string    `json:"source_provider"`
+	SourceURL      string    `json:"source_url"`
+	CreatedAt      time.Time `json:"created_at"`
+	Targets        []Target  `json:"targets,omitempty"`
+}
+
+// Target represents a replication target
+type Target struct {
+	ID           string    `json:"id"`
+	RepositoryID string    `json:"repository_id"`
+	Provider     string    `json:"provider"`
+	RemoteURL    string    `json:"remote_url"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// CreateRepositoryRequest is the request body for creating a repository
+type CreateRepositoryRequest struct {
+	Name           string `json:"name"`
+	SourceProvider string `json:"source_provider"`
+	SourceURL      string `json:"source_url"`
+}
+
+// CreateTargetRequest is the request body for creating a target
+type CreateTargetRequest struct {
+	Provider  string `json:"provider"`
+	RemoteURL string `json:"remote_url"`
+}
+
+// Handler holds the database connection
+type Handler struct {
+	DB *database.DB
+}
+
+// HealthCheck returns the health status of the service
+// @Summary Health check
+// @Description Returns the health status of the service
+// @Tags health
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /health [get]
+func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "ok",
+	})
+}
+
+// CreateRepository handles POST /repositories
+// @Summary Create a repository
+// @Description Create a new repository with source provider and URL
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Param repository body CreateRepositoryRequest true "Repository data"
+// @Success 201 {object} Repository
+// @Router /repositories [post]
+func (h *Handler) CreateRepository(w http.ResponseWriter, r *http.Request) {
+	var req CreateRepositoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if strings.TrimSpace(req.Name) == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.SourceProvider) == "" {
+		http.Error(w, "source_provider is required", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.SourceURL) == "" {
+		http.Error(w, "source_url is required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate provider
+	if !allowedProviders[req.SourceProvider] {
+		http.Error(w, "invalid source_provider. allowed: github, gitlab, gitea", http.StatusBadRequest)
+		return
+	}
+
+	// Validate URL (must start with https:// or ssh)
+	if !strings.HasPrefix(req.SourceURL, "https://") && !strings.HasPrefix(req.SourceURL, "ssh://") {
+		http.Error(w, "source_url must start with https:// or ssh://", http.StatusBadRequest)
+		return
+	}
+
+	repo := Repository{
+		ID:             uuid.New().String(),
+		Name:           req.Name,
+		SourceProvider: req.SourceProvider,
+		SourceURL:      req.SourceURL,
+		CreatedAt:      time.Now(),
+	}
+
+	ctx := context.Background()
+	_, err := h.DB.ExecContext(ctx,
+		`INSERT INTO repositories (id, name, source_provider, source_url, created_at) 
+		 VALUES ($1, $2, $3, $4, $5)`,
+		repo.ID, repo.Name, repo.SourceProvider, repo.SourceURL, repo.CreatedAt)
+	if err != nil {
+		http.Error(w, "failed to create repository", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(repo)
+}
+
+// ListRepositories handles GET /repositories
+// @Summary List repositories
+// @Description Get all repositories with their replication targets
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Success 200 {array} Repository
+// @Router /repositories [get]
+func (h *Handler) ListRepositories(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	// Get all repositories
+	rows, err := h.DB.QueryContext(ctx,
+		`SELECT id, name, source_provider, source_url, created_at FROM repositories ORDER BY created_at DESC`)
+	if err != nil {
+		http.Error(w, "failed to fetch repositories", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var repos []Repository
+	for rows.Next() {
+		var repo Repository
+		if err := rows.Scan(&repo.ID, &repo.Name, &repo.SourceProvider, &repo.SourceURL, &repo.CreatedAt); err != nil {
+			http.Error(w, "failed to scan repository", http.StatusInternalServerError)
+			return
+		}
+
+		// Get targets for this repository
+		targetRows, err := h.DB.QueryContext(ctx,
+			`SELECT id, repository_id, provider, remote_url, created_at 
+			 FROM replication_targets WHERE repository_id = $1`, repo.ID)
+		if err != nil {
+			http.Error(w, "failed to fetch targets", http.StatusInternalServerError)
+			return
+		}
+
+		for targetRows.Next() {
+			var target Target
+			if err := targetRows.Scan(&target.ID, &target.RepositoryID, &target.Provider, &target.RemoteURL, &target.CreatedAt); err != nil {
+				targetRows.Close()
+				http.Error(w, "failed to scan target", http.StatusInternalServerError)
+				return
+			}
+			repo.Targets = append(repo.Targets, target)
+		}
+		targetRows.Close()
+
+		repos = append(repos, repo)
+	}
+
+	if repos == nil {
+		repos = []Repository{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(repos)
+}
+
+// CreateTarget handles POST /repositories/{id}/targets
+// @Summary Create a replication target
+// @Description Add a replication target to an existing repository
+// @Tags targets
+// @Accept json
+// @Produce json
+// @Param id path string true "Repository ID"
+// @Param target body CreateTargetRequest true "Target data"
+// @Success 201 {object} Target
+// @Router /repositories/{id}/targets [post]
+func (h *Handler) CreateTarget(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	repoID := vars["id"]
+
+	// Verify repository exists
+	var exists bool
+	err := h.DB.QueryRowContext(context.Background(),
+		"SELECT EXISTS(SELECT 1 FROM repositories WHERE id = $1)", repoID).Scan(&exists)
+	if err != nil || !exists {
+		http.Error(w, "repository not found", http.StatusNotFound)
+		return
+	}
+
+	var req CreateTargetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate provider
+	if strings.TrimSpace(req.Provider) == "" {
+		http.Error(w, "provider is required", http.StatusBadRequest)
+		return
+	}
+	if !allowedProviders[req.Provider] {
+		http.Error(w, "invalid provider. allowed: github, gitlab, gitea", http.StatusBadRequest)
+		return
+	}
+
+	// Validate URL
+	if strings.TrimSpace(req.RemoteURL) == "" {
+		http.Error(w, "remote_url is required", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(req.RemoteURL, "https://") && !strings.HasPrefix(req.RemoteURL, "ssh://") {
+		http.Error(w, "remote_url must start with https:// or ssh://", http.StatusBadRequest)
+		return
+	}
+
+	target := Target{
+		ID:           uuid.New().String(),
+		RepositoryID: repoID,
+		Provider:     req.Provider,
+		RemoteURL:    req.RemoteURL,
+		CreatedAt:    time.Now(),
+	}
+
+	ctx := context.Background()
+	_, err = h.DB.ExecContext(ctx,
+		`INSERT INTO replication_targets (id, repository_id, provider, remote_url, created_at) 
+		 VALUES ($1, $2, $3, $4, $5)`,
+		target.ID, target.RepositoryID, target.Provider, target.RemoteURL, target.CreatedAt)
+	if err != nil {
+		http.Error(w, "failed to create target", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(target)
+}
