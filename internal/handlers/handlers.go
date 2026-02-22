@@ -19,14 +19,12 @@ import (
 // @host            localhost:8080
 // @BasePath        /
 
-// Allowed providers per AGENT_GUIDE security principles
 var allowedProviders = map[string]bool{
 	"github": true,
 	"gitlab": true,
 	"gitea":  true,
 }
 
-// Repository represents a source repository
 type Repository struct {
 	ID             string    `json:"id"`
 	Name           string    `json:"name"`
@@ -36,7 +34,6 @@ type Repository struct {
 	Targets        []Target  `json:"targets,omitempty"`
 }
 
-// Target represents a replication target
 type Target struct {
 	ID           string    `json:"id"`
 	RepositoryID string    `json:"repository_id"`
@@ -45,20 +42,17 @@ type Target struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// CreateRepositoryRequest is the request body for creating a repository
 type CreateRepositoryRequest struct {
 	Name           string `json:"name"`
 	SourceProvider string `json:"source_provider"`
 	SourceURL      string `json:"source_url"`
 }
 
-// CreateTargetRequest is the request body for creating a target
 type CreateTargetRequest struct {
 	Provider  string `json:"provider"`
 	RemoteURL string `json:"remote_url"`
 }
 
-// Handler holds the database connection
 type Handler struct {
 	DB *database.DB
 }

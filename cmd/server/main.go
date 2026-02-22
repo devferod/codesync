@@ -1,4 +1,4 @@
-// @title           GitBackup API
+// @title           GitSync API
 // @version         1.0
 // @description     API for managing git repositories and replication targets
 // @host            localhost:8080
@@ -11,11 +11,12 @@ import (
 	"net/http"
 	"os"
 
+	"gitsync/internal/database"
+	"gitsync/internal/handlers"
+
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-	"gitsync/internal/database"
-	"gitsync/internal/handlers"
 
 	swaggerdocs "gitsync/docs"
 )
