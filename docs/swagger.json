@@ -2,7 +2,7 @@
     "swagger": "2.0",
     "info": {
         "description": "API for managing git repositories and replication targets",
-        "title": "GitBackup API",
+        "title": "GitSync API",
         "contact": {},
         "version": "1.0"
     },
