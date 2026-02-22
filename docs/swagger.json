@@ -1,0 +1,211 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for managing git repositories and replication targets",
+        "title": "GitBackup API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Returns the health status of the service",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/repositories": {
+            "get": {
+                "description": "Get all repositories with their replication targets",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repositories"
+                ],
+                "summary": "List repositories",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.Repository"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new repository with source provider and URL",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repositories"
+                ],
+                "summary": "Create a repository",
+                "parameters": [
+                    {
+                        "description": "Repository data",
+                        "name": "repository",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateRepositoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.Repository"
+                        }
+                    }
+                }
+            }
+        },
+        "/repositories/{id}/targets": {
+            "post": {
+                "description": "Add a replication target to an existing repository",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "targets"
+                ],
+                "summary": "Create a replication target",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Repository ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Target data",
+                        "name": "target",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateTargetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.Target"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.CreateRepositoryRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "source_provider": {
+                    "type": "string"
+                },
+                "source_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.CreateTargetRequest": {
+            "type": "object",
+            "properties": {
+                "provider": {
+                    "type": "string"
+                },
+                "remote_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.Repository": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "source_provider": {
+                    "type": "string"
+                },
+                "source_url": {
+                    "type": "string"
+                },
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.Target"
+                    }
+                }
+            }
+        },
+        "handlers.Target": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "remote_url": {
+                    "type": "string"
+                },
+                "repository_id": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

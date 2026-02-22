@@ -1,0 +1,138 @@
+basePath: /
+definitions:
+  handlers.CreateRepositoryRequest:
+    properties:
+      name:
+        type: string
+      source_provider:
+        type: string
+      source_url:
+        type: string
+    type: object
+  handlers.CreateTargetRequest:
+    properties:
+      provider:
+        type: string
+      remote_url:
+        type: string
+    type: object
+  handlers.Repository:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      source_provider:
+        type: string
+      source_url:
+        type: string
+      targets:
+        items:
+          $ref: '#/definitions/handlers.Target'
+        type: array
+    type: object
+  handlers.Target:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      provider:
+        type: string
+      remote_url:
+        type: string
+      repository_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API for managing git repositories and replication targets
+  title: GitBackup API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns the health status of the service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - health
+  /repositories:
+    get:
+      consumes:
+      - application/json
+      description: Get all repositories with their replication targets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Repository'
+            type: array
+      summary: List repositories
+      tags:
+      - repositories
+    post:
+      consumes:
+      - application/json
+      description: Create a new repository with source provider and URL
+      parameters:
+      - description: Repository data
+        in: body
+        name: repository
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateRepositoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.Repository'
+      summary: Create a repository
+      tags:
+      - repositories
+  /repositories/{id}/targets:
+    post:
+      consumes:
+      - application/json
+      description: Add a replication target to an existing repository
+      parameters:
+      - description: Repository ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target data
+        in: body
+        name: target
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTargetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.Target'
+      summary: Create a replication target
+      tags:
+      - targets
+swagger: "2.0"
