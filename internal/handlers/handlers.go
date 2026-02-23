@@ -115,6 +115,20 @@ func (h *Handler) CreateRepository(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify if repository URL already exists in the database
+	var exists bool
+	if err := h.DB.QueryRowContext(context.Background(),
+		"SELECT EXISTS(SELECT 1 FROM repositories WHERE source_url = $1)", req.SourceURL).Scan(&exists); err != nil {
+		log.Printf("ERROR: failed to check if repository exists: %v", err)
+		http.Error(w, "failed to check repository existence", http.StatusInternalServerError)
+		return
+	}
+
+	if exists {
+		http.Error(w, "repository with this source_url already exists", http.StatusConflict)
+		return
+	}
+
 	repo := Repository{
 		ID:             uuid.New().String(),
 		Name:           req.Name,
