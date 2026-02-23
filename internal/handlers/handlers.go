@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -128,7 +129,8 @@ func (h *Handler) CreateRepository(w http.ResponseWriter, r *http.Request) {
 		 VALUES ($1, $2, $3, $4, $5)`,
 		repo.ID, repo.Name, repo.SourceProvider, repo.SourceURL, repo.CreatedAt)
 	if err != nil {
-		http.Error(w, "failed to create repository", http.StatusInternalServerError)
+		log.Printf("ERROR: failed to insert repository: %v", err)
+		http.Error(w, "failed to create repository: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
