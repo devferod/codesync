@@ -261,6 +261,21 @@ func (h *Handler) CreateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify if target URL already exists for this repository
+	var target_exists bool
+	if err := h.DB.QueryRowContext(context.Background(),
+		"SELECT EXISTS(SELECT 1 FROM replication_targets WHERE repository_id = $1 AND remote_url = $2)",
+		repoID, req.RemoteURL).Scan(&target_exists); err != nil {
+		log.Printf("ERROR: failed to check if target exists: %v", err)
+		http.Error(w, "failed to check target existence", http.StatusInternalServerError)
+		return
+	}
+
+	if target_exists {
+		http.Error(w, "target with this remote_url already exists for this repository", http.StatusConflict)
+		return
+	}
+
 	target := Target{
 		ID:           uuid.New().String(),
 		RepositoryID: repoID,
