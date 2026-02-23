@@ -1,6 +1,6 @@
 -- Create repositories table
 CREATE TABLE IF NOT EXISTS repositories (
-    id TEXT PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     source_provider TEXT NOT NULL,
     source_url TEXT NOT NULL,
@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS repositories (
 
 -- Create replication_targets table
 CREATE TABLE IF NOT EXISTS replication_targets (
-    id TEXT PRIMARY KEY,
-    repository_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    repository_id UUID NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
     provider TEXT NOT NULL,
     remote_url TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()

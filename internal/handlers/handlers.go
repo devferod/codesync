@@ -10,7 +10,6 @@ import (
 
 	"gitsync/internal/database"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -130,7 +129,6 @@ func (h *Handler) CreateRepository(w http.ResponseWriter, r *http.Request) {
 	}
 
 	repo := Repository{
-		ID:             uuid.New().String(),
 		Name:           req.Name,
 		SourceProvider: req.SourceProvider,
 		SourceURL:      req.SourceURL,
@@ -138,10 +136,11 @@ func (h *Handler) CreateRepository(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	_, err := h.DB.ExecContext(ctx,
-		`INSERT INTO repositories (id, name, source_provider, source_url, created_at) 
-		 VALUES ($1, $2, $3, $4, $5)`,
-		repo.ID, repo.Name, repo.SourceProvider, repo.SourceURL, repo.CreatedAt)
+	err := h.DB.QueryRowContext(ctx,
+		`INSERT INTO repositories (name, source_provider, source_url, created_at) 
+		 VALUES ($1, $2, $3, $4) 
+		 RETURNING id`,
+		repo.Name, repo.SourceProvider, repo.SourceURL, repo.CreatedAt).Scan(&repo.ID)
 	if err != nil {
 		log.Printf("ERROR: failed to insert repository: %v", err)
 		http.Error(w, "failed to create repository: "+err.Error(), http.StatusInternalServerError)
@@ -277,7 +276,6 @@ func (h *Handler) CreateTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	target := Target{
-		ID:           uuid.New().String(),
 		RepositoryID: repoID,
 		Provider:     req.Provider,
 		RemoteURL:    req.RemoteURL,
@@ -285,10 +283,11 @@ func (h *Handler) CreateTarget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	_, err = h.DB.ExecContext(ctx,
-		`INSERT INTO replication_targets (id, repository_id, provider, remote_url, created_at) 
-		 VALUES ($1, $2, $3, $4, $5)`,
-		target.ID, target.RepositoryID, target.Provider, target.RemoteURL, target.CreatedAt)
+	err = h.DB.QueryRowContext(ctx,
+		`INSERT INTO replication_targets (repository_id, provider, remote_url, created_at) 
+		 VALUES ($1, $2, $3, $4) 
+		 RETURNING id`,
+		target.RepositoryID, target.Provider, target.RemoteURL, target.CreatedAt).Scan(&target.ID)
 	if err != nil {
 		http.Error(w, "failed to create target", http.StatusInternalServerError)
 		return
