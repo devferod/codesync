@@ -3,6 +3,7 @@ CREATE TABLE executions (
     repository_id UUID NOT NULL,
     target_id UUID NOT NULL,
     status TEXT NOT NULL,
+    error TEXT,
     started_at TIMESTAMP NOT NULL DEFAULT NOW(),
     finished_at TIMESTAMP,
     FOREIGN KEY (repository_id) REFERENCES repositories(id),
