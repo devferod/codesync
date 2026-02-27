@@ -1,4 +1,4 @@
-CREATE TABLE executions (
+CREATE TABLE IF NOT EXISTS executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     repository_id UUID NOT NULL,
     target_id UUID NOT NULL,
