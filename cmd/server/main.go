@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// Initialize handlers
-	h := &handlers.Handler{DB: db}
+	h := handlers.NewHandler(db)
 
 	// Setup router
 	r := mux.NewRouter()
